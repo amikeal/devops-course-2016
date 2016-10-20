@@ -8,7 +8,7 @@ LOG_PATH = 'logs/'
 
 # Initialize some variables
 i = 0
-totals = {}
+requests_by_month = {}
 files = {}
 counts = {}
 errors = []
@@ -39,7 +39,7 @@ File.foreach(LOCAL_FILE) do |line|
 
 	# Grab the data from the fields we care about
 	req_date = Date.strptime(vals[1], '%d/%b/%Y:%H:%M:%S')
-	d_str = req_date.strftime('%Y-%m')
+	mon_year = req_date.strftime('%Y-%m')
 	http_verb = vals[2]
 	file_name = vals[3]
 	stat_code = vals[5]
@@ -51,10 +51,10 @@ File.foreach(LOCAL_FILE) do |line|
 	counts[stat_code] = (if counts[stat_code] then counts[stat_code]+=1 else 1 end)
 
 	# Check if we're on a new date; if so, add a new array to the hash
-	unless totals[d_str] then totals[d_str] = [] end
+	unless requests_by_month[mon_year] then requests_by_month[mon_year] = [] end
 
 	# Add the whole line into the array for that day
-	totals[d_str].push(line)
+	requests_by_month[mon_year].push(line)
 
 end
 puts "\n\n"
@@ -62,20 +62,28 @@ puts "\n\n"
 # Sort the hash with file request counts to find the highest (and lowest)
 sorted_files = files.sort_by { |k, v| -v }
 
+#
 # Calculate a grand total by adding the counts from each month
 #   Also, write the lines out to per-month log entries`
+#
 grand_total = 0
+# Ensure that the directory for my new log files exists
 Dir.mkdir(LOG_PATH) unless File.exists?(LOG_PATH)
-totals.each do |key, arr|
+# Loop through the 'requests_by_month' hash
+requests_by_month.each do |key, arr|
 	grand_total += arr.count
 	file_name = LOG_PATH + key + '.log'
+	# Open a new file in the log directory for this month
 	File.open(file_name, "w+") do |f|
+		# Dump all the lines in the array to the new file
 		f.puts(arr)
 	end
 	puts "  Writing new file to disk: #{file_name} (#{arr.count} entries)"
 end
 
+#
 # Sum all the status codes to get the totals
+#
 totals_3xx = 0
 totals_4xx = 0
 totals_5xx = 0
@@ -97,10 +105,10 @@ puts "\n\n\n"
 puts "--- STATS ---"
 puts "Total number of requests: #{grand_total}"
 puts "Number of requests per month: "
-totals.each do |mon, lines|
+requests_by_month.each do |mon, lines|
 	puts "    #{mon}: #{lines.count}"
 end
-puts "Average requests per month: #{grand_total / totals.count}"
+puts "Average requests per month: #{grand_total / requests_by_month.count}"
 puts "Most commonly requested file: #{sorted_files[0]}"
 puts "Least requested file: #{sorted_files[sorted_files.count-1]}"
 puts "Percentage of errors: #{err_pct}% (#{totals_4xx} total)"
